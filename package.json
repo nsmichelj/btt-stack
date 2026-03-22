@@ -3,14 +3,33 @@
   "version": "0.0.1",
   "module": "src/index.ts",
   "type": "module",
-  "devDependencies": {
-    "@types/bun": "latest"
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "cli:link": "pnpm link . --global",
+    "cli:unlink": "pnpm rm --global btt-stack"
   },
-  "peerDependencies": {
+  "bin": {
+    "btt-stack": "./dist/index.js"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/bun": "latest",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwindcss": "^4",
+    "tsup": "^8.5.1",
     "typescript": "^5"
   },
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "commander": "^14.0.3",
+    "execa": "^9.6.1",
+    "fs-extra": "^11.3.4",
     "gradient-string": "^3.0.0"
   }
 }
