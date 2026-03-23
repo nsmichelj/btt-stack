@@ -1,9 +1,18 @@
-export function logNextSteps({ projectName, pkgManager }: { projectName: string; pkgManager: string }) {
-  console.log("🎉 Your project is ready!"); 
+import chalk from "chalk";
+import { logger } from "./logger";
+
+export function logNextSteps({
+  projectName,
+  pkgManager,
+}: {
+  projectName: string;
+  pkgManager: string;
+}) {
+  logger.success("🎉 Your project is ready!");
   console.log("");
   console.log(`Next steps:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`  ${pkgManager} run dev`);
+  console.log(`  ${chalk.green("cd")} ${projectName}`);
+  console.log(`  ${chalk.green(pkgManager)} run dev`);
   console.log("");
-  console.log(`🚀 Start building something better.`);
+  logger.info(`🚀 Start building something better.`);
 }
