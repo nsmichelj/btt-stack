@@ -3,6 +3,10 @@ import { LintingOption } from "@/types";
 import fs from "fs-extra";
 import path from "path";
 
+function resolveSrcPath(projectDir: string, srcDir: boolean) {
+  return srcDir ? path.join(projectDir, "src") : projectDir;
+}
+
 async function updatePackageJson(
   projectDir: string,
   {
@@ -19,6 +23,7 @@ async function updatePackageJson(
 ) {
   const packageJsonPath = path.join(projectDir, "package.json");
   const packageJson = await fs.readJson(packageJsonPath);
+
   packageJson.name = projectName;
 
   const dependencies: Record<string, string> = {};
@@ -47,7 +52,7 @@ async function updatePackageJson(
   } else if (linting === "eslint") {
     devDependencies["eslint"] = "^8.57.0";
     devDependencies["eslint-config-next"] = "16.2.1";
-    scripts["lint:check"] = "eslint . ";
+    scripts["lint:check"] = "eslint .";
     scripts["lint:fix"] = "eslint . --fix";
   }
 
@@ -66,6 +71,23 @@ async function updatePackageJson(
   await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
 }
 
+async function updateTsConfig(projectDir: string, srcDir: boolean) {
+  if (!srcDir) return;
+
+  const tsconfigPath = path.join(projectDir, "tsconfig.json");
+  const tsconfig = await fs.readJson(tsconfigPath);
+
+  tsconfig.compilerOptions = {
+    ...tsconfig.compilerOptions,
+    baseUrl: ".",
+    paths: {
+      "@/*": ["./src/*"],
+    },
+  };
+
+  await fs.writeJson(tsconfigPath, tsconfig, { spaces: 2 });
+}
+
 async function updateReadme(
   projectDir: string,
   {
@@ -78,93 +100,121 @@ async function updateReadme(
 ) {
   const readmePath = path.join(projectDir, "readme.md");
   const readme = await fs.readFile(readmePath, "utf-8");
+
   const updatedReadme = readme
     .replace(/{{PROJECT_NAME}}/g, projectName)
     .replace(/{{PKG_MANAGER}}/g, pkgManager);
+
   await fs.writeFile(readmePath, updatedReadme);
 }
 
-async function addAuth(projectDir: string, database: boolean) {
+async function addAuth(projectDir: string, database: boolean, srcDir: boolean) {
+  const baseDir = resolveSrcPath(projectDir, srcDir);
+
   const authTemplateDir = path.join(PKG_ROOT, "templates/features/auth");
+
   if (database) {
-    const authWithDbTemplateDir = path.join(
-      authTemplateDir,
-      "instance/with-postgres.ts",
-    );
     await fs.copy(
-      authWithDbTemplateDir,
-      path.join(projectDir, "lib/auth/index.ts"),
+      path.join(authTemplateDir, "instance/with-postgres.ts"),
+      path.join(baseDir, "lib/auth/index.ts"),
     );
   } else {
-    const authBaseTemplateDir = path.join(authTemplateDir, "instance/base.ts");
     await fs.copy(
-      authBaseTemplateDir,
-      path.join(projectDir, "lib/auth/index.ts"),
+      path.join(authTemplateDir, "instance/base.ts"),
+      path.join(baseDir, "lib/auth/index.ts"),
     );
   }
-  const authClientTemplateDir = path.join(authTemplateDir, "client.ts");
+
   await fs.copy(
-    authClientTemplateDir,
-    path.join(projectDir, "lib/auth/client.ts"),
+    path.join(authTemplateDir, "client.ts"),
+    path.join(baseDir, "lib/auth/client.ts"),
   );
 
-  const appTemplateDir = path.join(PKG_ROOT, "templates/features/app");
-  const appProjectDir = path.join(projectDir, "app");
-  await fs.copy(appTemplateDir, appProjectDir);
+  const appTemplateDir = path.join(
+    PKG_ROOT,
+    "templates/features/app/api/auth/[...all]",
+  );
+  await fs.copy(appTemplateDir, path.join(baseDir, "app/api/auth/[...all]"));
 }
 
-async function addDatabase(projectDir: string, authentication: boolean) {
+async function addDatabase(
+  projectDir: string,
+  authentication: boolean,
+  srcDir: boolean,
+) {
+  const baseDir = resolveSrcPath(projectDir, srcDir);
+
   const dbTemplateDir = path.join(PKG_ROOT, "templates/features/db");
 
   if (authentication) {
-    const dbWithAuthTemplateDir = path.join(
-      dbTemplateDir,
-      "schemas/auth-postgres.ts",
-    );
     await fs.copy(
-      dbWithAuthTemplateDir,
-      path.join(projectDir, "lib/db/schema.ts"),
+      path.join(dbTemplateDir, "schemas/auth-postgres.ts"),
+      path.join(baseDir, "lib/db/schema.ts"),
     );
   } else {
-    const dbBaseTemplateDir = path.join(
-      dbTemplateDir,
-      "schemas/base-postgres.ts",
+    await fs.copy(
+      path.join(dbTemplateDir, "schemas/base-postgres.ts"),
+      path.join(baseDir, "lib/db/schema.ts"),
     );
-    await fs.copy(dbBaseTemplateDir, path.join(projectDir, "lib/db/schema.ts"));
   }
 
-  const dbInstanceTemplateDir = path.join(dbTemplateDir, "index.ts");
   await fs.copy(
-    dbInstanceTemplateDir,
-    path.join(projectDir, "lib/db/index.ts"),
+    path.join(dbTemplateDir, "index.ts"),
+    path.join(baseDir, "lib/db/index.ts"),
   );
 
-  const dbDrizzleConfigTemplateDir = path.join(
-    dbTemplateDir,
-    "drizzle.config.ts",
+  let content = await fs.readFile(
+    path.join(dbTemplateDir, "drizzle.config.ts"),
+    "utf-8",
   );
-  await fs.copy(
-    dbDrizzleConfigTemplateDir,
-    path.join(projectDir, "drizzle.config.ts"),
-  );
+
+  const schemaPath = srcDir ? "./src/lib/db/schema.ts" : "./lib/db/schema.ts";
+  const outPath = srcDir ? "./src/lib/db/migrations" : "./lib/db/migrations";
+  content = content
+    .replace(/{{SCHEMA_PATH}}/g, schemaPath)
+    .replace(/{{OUT_PATH}}/g, outPath);
+  await fs.writeFile(path.join(projectDir, "drizzle.config.ts"), content);
 }
 
 export async function addLinting(projectDir: string, linting: LintingOption) {
+  const linterTemplateDir = path.join(PKG_ROOT, "templates/features/linter");
+
   if (linting === "biome") {
-    const linterTemplateDir = path.join(PKG_ROOT, "templates/features/linter");
-    const linterBaseTemplateDir = path.join(linterTemplateDir, "biome.json");
-    await fs.copy(linterBaseTemplateDir, path.join(projectDir, "biome.json"));
-  } else if (linting === "eslint") {
-    const linterTemplateDir = path.join(PKG_ROOT, "templates/features/linter");
-    const linterBaseTemplateDir = path.join(
-      linterTemplateDir,
-      "eslint.config.mjs",
-    );
     await fs.copy(
-      linterBaseTemplateDir,
+      path.join(linterTemplateDir, "biome.json"),
+      path.join(projectDir, "biome.json"),
+    );
+  } else if (linting === "eslint") {
+    await fs.copy(
+      path.join(linterTemplateDir, "eslint.config.mjs"),
       path.join(projectDir, "eslint.config.mjs"),
     );
   }
+}
+
+async function addBase(projectDir: string) {
+  const templateDir = path.join(PKG_ROOT, "templates/base");
+  await fs.copy(templateDir, projectDir);
+}
+
+async function addApp(projectDir: string, srcDir: boolean) {
+  const baseDir = resolveSrcPath(projectDir, srcDir);
+  const appTemplateDir = path.join(PKG_ROOT, "templates/features/app");
+
+  await fs.copy(
+    path.join(appTemplateDir, "/pages/base.tsx"),
+    path.join(baseDir, "app/page.tsx"),
+  );
+
+  await fs.copy(
+    path.join(appTemplateDir, "/layouts/base.tsx"),
+    path.join(baseDir, "app/layout.tsx"),
+  );
+
+  await fs.copy(
+    path.join(appTemplateDir, "/styles/base.css"),
+    path.join(baseDir, "app/globals.css"),
+  );
 }
 
 export async function createProject({
@@ -174,6 +224,7 @@ export async function createProject({
   authentication,
   database,
   linting,
+  srcDir,
 }: {
   projectRoot: string;
   projectName: string;
@@ -181,18 +232,19 @@ export async function createProject({
   authentication: boolean;
   database: boolean;
   linting: LintingOption;
+  srcDir: boolean;
 }) {
-  const templateDir = path.join(PKG_ROOT, "templates/base");
   const projectDir = path.join(projectRoot, projectName);
 
-  await fs.copy(templateDir, projectDir);
+  await addBase(projectDir);
+  await addApp(projectDir, srcDir);
 
   if (authentication) {
-    await addAuth(projectDir, database);
+    await addAuth(projectDir, database, srcDir);
   }
 
   if (database) {
-    await addDatabase(projectDir, authentication);
+    await addDatabase(projectDir, authentication, srcDir);
   }
 
   if (linting) {
@@ -205,5 +257,6 @@ export async function createProject({
     authentication,
     linting,
   });
+  await updateTsConfig(projectDir, srcDir);
   await updateReadme(projectDir, { projectName, pkgManager });
 }

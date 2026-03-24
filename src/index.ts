@@ -28,6 +28,7 @@ const defaultOptions = {
   authentication: true,
   database: true,
   linting: "biome" as LintingOption,
+  srcDir: false,
   overwrite: false,
   skipPrompts: false,
 };
@@ -47,6 +48,7 @@ async function main() {
     .option("-a, --auth", "Add authentication")
     .option("-d, --db", "Add database")
     .option("-l, --linting", "Add linting")
+    .option("--src-dir", "Add src directory")
     .option(
       "-y, --yes",
       "Skip the interactive prompts",
@@ -68,6 +70,7 @@ async function main() {
           authentication: defaultOptions.authentication,
           database: defaultOptions.database,
           linting: defaultOptions.linting,
+          srcDir: defaultOptions.srcDir,
         });
         logNextSteps({
           projectName: providedProjectName ?? defaultOptions.projectName,
@@ -151,6 +154,13 @@ async function main() {
                 initialValue: defaultOptions.linting,
               }),
           }),
+          ...(!options.srcDir && {
+            srcDir: () =>
+              clack.confirm({
+                message: "Do you want your code inside a `src/` directory?",
+                initialValue: defaultOptions.srcDir,
+              }),
+          }),
         },
         {
           onCancel() {
@@ -173,6 +183,7 @@ async function main() {
           authentication: project.authentication ?? options.auth,
           database: project.database ?? options.db,
           linting: project.linting ?? options.linting,
+          srcDir: project.srcDir ?? options.srcDir,
         });
         s.stop("Project created successfully!");
 
