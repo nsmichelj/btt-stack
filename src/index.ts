@@ -133,7 +133,7 @@ async function main() {
           ...(!options.linting && {
             linting: () =>
               clack.select<LintingOption>({
-                message: "Select a linting option",
+                message: "Which linting tool would you like to use?",
                 options: [
                   {
                     label: "Biome",
