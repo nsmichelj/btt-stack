@@ -13,6 +13,7 @@ import { detectPackageManager } from "@/utils/package-manager";
 import { renderTitle } from "@/utils/renderTitle";
 import { validateProjectName } from "@/utils/validate-project-name";
 import chalk from "chalk";
+import { LintingOption } from "./types";
 
 const program = new Command();
 
@@ -26,6 +27,7 @@ const defaultOptions = {
   projectRoot: process.cwd(),
   authentication: true,
   database: true,
+  linting: "biome" as LintingOption,
   overwrite: false,
   skipPrompts: false,
 };
@@ -42,8 +44,9 @@ async function main() {
       "Current working directory",
       defaultOptions.projectRoot,
     )
-    .option("-a, --auth", "Add authentication", defaultOptions.authentication)
-    .option("-d, --db", "Add database", defaultOptions.database)
+    .option("-a, --auth", "Add authentication")
+    .option("-d, --db", "Add database")
+    .option("-l, --linting", "Add linting")
     .option(
       "-y, --yes",
       "Skip the interactive prompts",
@@ -64,6 +67,7 @@ async function main() {
           projectName: providedProjectName ?? defaultOptions.projectName,
           authentication: defaultOptions.authentication,
           database: defaultOptions.database,
+          linting: defaultOptions.linting,
         });
         logNextSteps({
           projectName: providedProjectName ?? defaultOptions.projectName,
@@ -121,6 +125,30 @@ async function main() {
                 initialValue: defaultOptions.database,
               }),
           }),
+          ...(!options.linting && {
+            linting: () =>
+              clack.select<LintingOption>({
+                message: "Select a linting option",
+                options: [
+                  {
+                    label: "Biome",
+                    value: "biome",
+                    hint: "Fast formatter and linter",
+                  },
+                  {
+                    label: "ESLint",
+                    value: "eslint",
+                    hint: "Standard linting with flexible rules",
+                  },
+                  {
+                    label: "None",
+                    value: "none",
+                    hint: "skip linter configuration",
+                  },
+                ],
+                initialValue: defaultOptions.linting,
+              }),
+          }),
         },
         {
           onCancel() {
@@ -142,6 +170,7 @@ async function main() {
           projectName,
           authentication: project.authentication ?? options.auth,
           database: project.database ?? options.db,
+          linting: project.linting ?? options.linting,
         });
         s.stop("Project created successfully!");
 

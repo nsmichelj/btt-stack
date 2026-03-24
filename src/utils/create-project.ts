@@ -1,4 +1,5 @@
 import { PKG_ROOT } from "@/consts";
+import { LintingOption } from "@/types";
 import fs from "fs-extra";
 import path from "path";
 
@@ -8,10 +9,12 @@ async function updatePackageJson(
     projectName,
     database,
     authentication,
+    linting,
   }: {
     projectName: string;
     database: boolean;
     authentication: boolean;
+    linting: LintingOption;
   },
 ) {
   const packageJsonPath = path.join(projectDir, "package.json");
@@ -35,6 +38,17 @@ async function updatePackageJson(
     scripts["db:migrate"] = "drizzle-kit migrate";
     scripts["db:push"] = "drizzle-kit push";
     scripts["db:studio"] = "drizzle-kit studio";
+  }
+
+  if (linting === "biome") {
+    devDependencies["@biomejs/biome"] = "^2.2.0";
+    scripts["lint:check"] = "biome check";
+    scripts["lint:fix"] = "biome format --write";
+  } else if (linting === "eslint") {
+    devDependencies["eslint"] = "^8.57.0";
+    devDependencies["eslint-config-next"] = "16.2.1";
+    scripts["lint:check"] = "eslint . ";
+    scripts["lint:fix"] = "eslint . --fix";
   }
 
   packageJson.dependencies = {
@@ -135,18 +149,38 @@ async function addDatabase(projectDir: string, authentication: boolean) {
   );
 }
 
+export async function addLinting(projectDir: string, linting: LintingOption) {
+  if (linting === "biome") {
+    const linterTemplateDir = path.join(PKG_ROOT, "templates/features/linter");
+    const linterBaseTemplateDir = path.join(linterTemplateDir, "biome.json");
+    await fs.copy(linterBaseTemplateDir, path.join(projectDir, "biome.json"));
+  } else if (linting === "eslint") {
+    const linterTemplateDir = path.join(PKG_ROOT, "templates/features/linter");
+    const linterBaseTemplateDir = path.join(
+      linterTemplateDir,
+      "eslint.config.mjs",
+    );
+    await fs.copy(
+      linterBaseTemplateDir,
+      path.join(projectDir, "eslint.config.mjs"),
+    );
+  }
+}
+
 export async function createProject({
   projectRoot,
   projectName,
   pkgManager,
   authentication,
   database,
+  linting,
 }: {
   projectRoot: string;
   projectName: string;
   pkgManager: string;
   authentication: boolean;
   database: boolean;
+  linting: LintingOption;
 }) {
   const templateDir = path.join(PKG_ROOT, "templates/base");
   const projectDir = path.join(projectRoot, projectName);
@@ -161,10 +195,15 @@ export async function createProject({
     await addDatabase(projectDir, authentication);
   }
 
+  if (linting) {
+    await addLinting(projectDir, linting);
+  }
+
   await updatePackageJson(projectDir, {
     projectName,
     database,
     authentication,
+    linting,
   });
   await updateReadme(projectDir, { projectName, pkgManager });
 }
