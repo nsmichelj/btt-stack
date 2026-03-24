@@ -99,7 +99,7 @@ async function main() {
             );
             if (fs.existsSync(projectDir)) {
               const confirm = await clack.confirm({
-                message: `Project ${chalk.cyan(results.name)} already exists. Do you want to overwrite it?`,
+                message: `Project ${chalk.cyan(results.name ?? providedProjectName)} already exists. Do you want to overwrite it?`,
                 initialValue: defaultOptions.overwrite,
               });
 
@@ -107,6 +107,8 @@ async function main() {
                 clack.cancel("Project creation canceled.");
                 process.exit(1);
               }
+
+              return confirm;
             } else {
               return undefined;
             }
